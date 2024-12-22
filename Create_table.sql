@@ -26,7 +26,8 @@ CONSTRAINT pk_genre PRIMARY KEY (genre_id)
 
 CREATE TABLE author (
 author_id char(8) NOT NULL,
-name varchar(30)
+name varchar(30),
+nationality varchar(20)
 );
 
 CREATE TABLE writen (
@@ -75,24 +76,24 @@ staff_id char(8),
 update_date date
 );
 
--- ADD CONSTAINT OF book TABLE
+-- ADD CONSTRAINT OF book TABLE
 ALTER TABLE book ADD CONSTRAINT fk_book2publisher FOREIGN KEY (publisher_id) REFERENCES publisher (publisher_id);
 ALTER TABLE book ADD CONSTRAINT fk_book2genre FOREIGN KEY (genre_id) REFERENCES genre (genre_id);
 
 
--- ADD CONSTAINT OF author TABLE
+-- ADD CONSTRAINT OF author TABLE
 ALTER TABLE author ADD CONSTRAINT pk_author PRIMARY KEY (author_id);
 
--- ADD CONSTAINT OF writen TABLE
+-- ADD CONSTRAINT OF writen TABLE
 ALTER TABLE writen ADD CONSTRAINT fk_write2book FOREIGN KEY (book_id) REFERENCES book (book_id);
 ALTER TABLE writen ADD CONSTRAINT fk_write2author FOREIGN KEY (author_id) REFERENCES author (author_id);
 
--- ADD CONSTAINT OF loan TABLE
+-- ADD CONSTRAINT OF loan TABLE
 ALTER TABLE loan ADD CONSTRAINT fk_loan2book FOREIGN KEY (book_id) REFERENCES book (book_id);
 ALTER TABLE loan ADD CONSTRAINT fk_loan2borrower FOREIGN KEY (borrower_id) REFERENCES borrower (borrower_id);
 ALTER TABLE loan ADD CONSTRAINT fk_loan2staff FOREIGN KEY (staff_id) REFERENCES staff (staff_id);
 
 
--- ADD CONSTAINT OF update TABLE
+-- ADD CONSTRAINT OF update TABLE
 ALTER TABLE update_table ADD CONSTRAINT fk_update2book FOREIGN KEY (book_id) REFERENCES book (book_id);
 ALTER TABLE update_table ADD CONSTRAINT fk_update2staff FOREIGN KEY (staff_id) REFERENCES staff (staff_id);
