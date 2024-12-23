@@ -2,7 +2,7 @@ CREATE TABLE book (
 book_id char(8) NOT NULL,
 title varchar(400) NOT NULL,
 language varchar(50),
-publish_year int,
+publish_date date,
 book_count int,
 CONSTRAINT pk_book PRIMARY KEY (book_id),
 CONSTRAINT fk_book2publisher FOREIGN KEY (publisher_id) REFERENCES publisher (publisher_id),
