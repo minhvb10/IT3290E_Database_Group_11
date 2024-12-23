@@ -1,7 +1,7 @@
 CREATE TABLE book (
 book_id char(8) NOT NULL,
-title varchar(30) NOT NULL,
-language varchar(20),
+title varchar(400) NOT NULL,
+language varchar(50),
 publish_year int,
 book_count int,
 CONSTRAINT pk_book PRIMARY KEY (book_id),
