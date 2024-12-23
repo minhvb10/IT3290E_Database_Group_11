@@ -24,7 +24,6 @@ CONSTRAINT pk_genre PRIMARY KEY (genre_id)
 CREATE TABLE author (
 author_id char(8) NOT NULL,
 name varchar(30),
-nationality varchar(20),
 CONSTRAINT pk_author PRIMARY KEY (author_id)
 );
 
