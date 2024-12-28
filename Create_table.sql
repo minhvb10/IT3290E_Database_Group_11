@@ -8,7 +8,6 @@ genre_id char(8) NOT NULL,
 title varchar(400) NOT NULL,
 languages varchar(30),
 publish_year int,
-book_count int,
 CONSTRAINT pk_book PRIMARY KEY (book_id)
 );
 
