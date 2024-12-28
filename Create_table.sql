@@ -71,8 +71,7 @@ CONSTRAINT pk_staff PRIMARY KEY (staff_id)
 
 CREATE TABLE update_table(
 book_id char(8),
-staff_id char(8),
-update_date date
+staff_id char(8)
 );
 
 -- ADD CONSTRAINT OF book TABLE
