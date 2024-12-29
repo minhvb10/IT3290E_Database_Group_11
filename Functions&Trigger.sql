@@ -39,7 +39,7 @@ BEGIN
     END IF;
     
     -- Set due date to 3 months from borrow date
-    NEW.return_date := NEW.borrow_date + INTERVAL '3 months';
+    NEW.due_date := NEW.borrow_date + INTERVAL '3 months';
     
     RETURN NEW;
 END;
@@ -58,7 +58,7 @@ DECLARE
     days_overdue INTEGER;
 BEGIN
     -- Calculate overdue days
-    days_overdue := EXTRACT(DAY FROM (NEW.date - NEW.return_date));
+    days_overdue := EXTRACT(DAY FROM (NEW.return_date - NEW.due_date));
     
     -- Handle late returns
     IF days_overdue > 0 THEN
@@ -67,23 +67,23 @@ BEGIN
         SET deposit = deposit - 100000
         WHERE borrower_id = NEW.borrower_id;
         
-        -- Set fee_paid flag
-        NEW.fee := 100000;
-        NEW.fee_paid := true;
+        -- Insert fine record
+        INSERT INTO fine (borrow_id, amount, reason) VALUES (NEW.borrow_id, 100000, 'Late return');
     END IF;
     
-    -- Handle damaged books
-    IF NEW.damaged = true THEN
+    -- Handle damaged or lost books
+    IF NEW.status = 'damaged' OR NEW.status = 'lost' THEN
         -- Deduct book price from deposit
         UPDATE borrower 
         SET deposit = deposit - (
-            SELECT COALESCE(book_count, 100000) 
+            SELECT price 
             FROM book 
             WHERE book_id = NEW.book_id
         )
         WHERE borrower_id = NEW.borrower_id;
         
-        NEW.book_paid := true;
+        -- Insert fine record
+        INSERT INTO fine (borrow_id, amount, reason) VALUES (NEW.borrow_id, (SELECT price FROM book WHERE book_id = NEW.book_id), 'Damaged or lost book');
     END IF;
     
     RETURN NEW;
@@ -108,7 +108,7 @@ BEGIN
         SELECT DISTINCT borrower_id
         FROM loan
         WHERE return_date IS NULL
-        AND CURRENT_DATE - borrow_date > 10
+        AND CURRENT_DATE - due_date > 10
     );
 END;
 $$ LANGUAGE plpgsql;
@@ -117,7 +117,7 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION initialize_borrower()
 RETURNS TRIGGER AS $$
 BEGIN
-    -- Set initial deposit amount
+    --Initial deposit amount
     NEW.deposit := 100000;
     NEW.black_list := false;
     
@@ -143,29 +143,17 @@ RETURNS TABLE (
     title VARCHAR,
     genre_name VARCHAR,
     author_name VARCHAR,
-    publisher_name VARCHAR,
-    available_copies INT
+    publisher_name VARCHAR
 ) AS $$
 BEGIN
     RETURN QUERY
-    SELECT DISTINCT
-        b.book_id,
-        b.title,
-        g.name AS genre_name,
-        a.name AS author_name,
-        p.name AS publisher_name,
-        b.book_count - COALESCE(
-            (SELECT COUNT(*) 
-             FROM loan l 
-             WHERE l.book_id = b.book_id 
-             AND l.return_date IS NULL
-            ), 0) AS available_copies
-    FROM book b
-    JOIN genre g ON b.genre_id = g.genre_id
-    JOIN writen w ON b.book_id = w.book_id
-    JOIN author a ON w.author_id = a.author_id
-    JOIN publisher p ON b.publisher_id = p.publisher_id
-    WHERE (p_title IS NULL OR b.title ILIKE '%' || p_title || '%')
+    SELECT DISTINCT b.book_id, b.title, g.name AS genre_name, a.name AS author_name,
+        p.name AS publisher_name
+    FROM book b JOIN genre g ON b.genre_id = g.genre_id
+                JOIN writen w ON b.book_id = w.book_id
+                JOIN author a ON w.author_id = a.author_id
+                JOIN publisher p ON b.publisher_id = p.publisher_id
+    WHERE (p_title IS NULL OR b.title ILIKE '%' || p_title || '%') -- Handle case-insensitive pattern matching
     AND (p_genre_id IS NULL OR b.genre_id = p_genre_id)
     AND (p_author_id IS NULL OR w.author_id = p_author_id)
     AND (p_publisher_id IS NULL OR b.publisher_id = p_publisher_id);
