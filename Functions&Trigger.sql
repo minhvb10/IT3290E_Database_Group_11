@@ -1,10 +1,20 @@
 -- Function to check borrower's eligibility
 CREATE OR REPLACE FUNCTION check_borrower_eligibility()
 RETURNS TRIGGER AS $$
+DECLARE 
+    cur_deposit INT;
 BEGIN
+    SELECT deposit INTO cur_deposit FROM borrower 
+    WHERE borrower_id = NEW.borrower_id;
+
     -- Check if borrower is blacklisted
     IF EXISTS (SELECT * FROM borrower WHERE borrower_id = NEW.borrower_id AND black_list = true) THEN
         RAISE EXCEPTION 'Borrower is blacklisted and cannot borrow books';
+    END IF;
+
+     -- Check if borrower has sufficient deposit
+    IF cur_deposit = 0  THEN
+        RAISE EXCEPTION 'Not enough deposit to borrow book';
     END IF;
 
     -- Check if borrower has less than 3 books currently borrowed
@@ -113,8 +123,8 @@ EXECUTE FUNCTION initialize_borrower();
 
 -- Function to search books (case insensitive)
 CREATE OR REPLACE FUNCTION search_books(p_title VARCHAR = NULL)
-RETURNS TABLE (book_id CHAR(8), title VARCHAR,genre_name VARCHAR, 
-    author_name VARCHAR, publisher_name VARCHAR) AS $$
+RETURNS TABLE (book_id CHAR(8), title VARCHAR(400), genre_name VARCHAR(30), 
+    author_name CHAR(100), publisher_name VARCHAR(100)) AS $$
 DECLARE total_books INT;
         loaned_books INT;
 BEGIN
@@ -128,15 +138,15 @@ BEGIN
         WHERE b.title ILIKE '%' || p_title || '%'
         AND return_date IS NULL ;
 
-        IF loaned_books == total_books THEN
-            RAISE EXCEPTION("There is no left book to borrow") 
-        ENDIF;
-    ENDIF; 
+        IF loaned_books = total_books THEN
+            RAISE EXCEPTION 'There is no left book to borrow' ;
+        END IF;
+    END IF; 
     RETURN QUERY
-    SELECT DISTINCT b.book_id, b.title, g.name AS genre_name, a.name AS author_name,
+    SELECT DISTINCT b.book_id, b.title, g.name AS genre_name, a.author_name AS author_name,
         p.name AS publisher_name
     FROM book b JOIN genre g ON b.genre_id = g.genre_id
-                JOIN writen w ON b.book_id = w.book_id
+                JOIN written w ON b.book_id = w.book_id
                 JOIN author a ON w.author_id = a.author_id
                 JOIN publisher p ON b.publisher_id = p.publisher_id
     WHERE (p_title IS NULL OR b.title ILIKE '%' || p_title || '%') ;
