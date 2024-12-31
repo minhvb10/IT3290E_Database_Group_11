@@ -55,7 +55,7 @@ WHERE borrower_id = '1576';
 create index idx_7 on loan(borrower_id)
 
 --8
---List the borrowers who have borrowed both book titled "Ukridge" and "The Log from the Sea of Cortez"
+--List the borrowers who have borrowed both book titled "The Wise Woman" and "Spares"
 SELECT br.*
 FROM borrower br
 JOIN loan l ON l.borrower_id = br.borrower_id
