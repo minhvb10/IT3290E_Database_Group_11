@@ -20,7 +20,7 @@ BEGIN
     -- Check if borrower has less than 3 books currently borrowed
     IF (SELECT COUNT(*) FROM loan 
         WHERE borrower_id = NEW.borrower_id 
-        AND return_date IS NULL) >= 3 THEN
+        AND date IS NULL) >= 3 THEN
         RAISE EXCEPTION 'Maximum borrowing limit (3 books) reached';
     END IF;
 
@@ -40,7 +40,7 @@ RETURNS TRIGGER AS $$
 BEGIN
     NEW.borrow_date := CURRENT_DATE;
     -- Set expected return date to 3 months from borrow date
-    NEW.date := NEW.borrow_date + INTERVAL '3 months';
+    NEW.return_date := NEW.borrow_date + INTERVAL '3 months';
     
     RETURN NEW;
 END;
@@ -48,7 +48,7 @@ $$ LANGUAGE plpgsql;
 
 -- Trigger to set loan period automatically
 CREATE TRIGGER set_loan_period_trigger
-BEFORE INSERT ON loan
+AFTER INSERT ON loan
 FOR EACH ROW
 EXECUTE FUNCTION set_loan_period();
 
@@ -84,21 +84,26 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER process_return_trigger
 BEFORE UPDATE ON loan
 FOR EACH ROW
-WHEN (OLD.return_date IS NULL AND NEW.return_date IS NOT NULL)
+WHEN (OLD.date IS NULL AND NEW.date IS NOT NULL)
 EXECUTE FUNCTION process_book_return();
 
--- Function to check for overdue books and blacklist borrowers
-CREATE OR REPLACE FUNCTION check_overdue_books()
+-- Function to update blacklist status for borrowers with books overdue by 10 days or more
+CREATE OR REPLACE FUNCTION update_blacklist_books()
 RETURNS void AS $$
 BEGIN
     -- Update blacklist status for borrowers with books overdue by 10 days or more
     UPDATE borrower
     SET black_list = true
     WHERE borrower_id IN (
-        SELECT DISTINCT borrower_id
+        SELECT borrower_id
         FROM loan
-        WHERE return_date IS NULL
-        AND CURRENT_DATE - date > 10
+        WHERE date IS NULL
+        AND CURRENT_DATE - return_date > 10
+        INTERSECT 
+        SELECT borrower_id
+        FROM loan
+        WHERE date IS NOT NULL
+        AND date - return_date > 10
     );
 END;
 $$ LANGUAGE plpgsql;
@@ -136,7 +141,7 @@ BEGIN
         SELECT COUNT(l.loan_id) INTO loaned_books
         FROM loan l JOIN book b using(book_id)
         WHERE b.title ILIKE '%' || p_title || '%'
-        AND return_date IS NULL ;
+        AND date IS NULL ;
 
         IF loaned_books = total_books THEN
             RAISE EXCEPTION 'There is no left book to borrow' ;
@@ -152,3 +157,24 @@ BEGIN
     WHERE (p_title IS NULL OR b.title ILIKE '%' || p_title || '%') ;
 END;
 $$ LANGUAGE plpgsql;
+
+
+-- Function to handle damaged book returns 
+CREATE OR REPLACE FUNCTION handle_damaged_book_return()
+RETURNS TRIGGER AS $$
+DECLARE
+    book_price INTEGER;
+BEGIN
+    SELECT price INTO book_price FROM book;
+    UPDATE loan SET NEW.fee = book_price
+    WHERE loan_id = NEW.loan_id;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger to handle damaged book returns 
+CREATE TRIGGER trigger_handle_damaged_book_return
+BEFORE UPDATE ON loan
+FOR EACH ROW
+WHEN (NEW.damaged = True)
+EXECUTE FUNCTION handle_damaged_book_return();
