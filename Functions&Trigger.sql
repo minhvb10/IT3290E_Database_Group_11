@@ -34,17 +34,25 @@ BEFORE INSERT ON loan
 FOR EACH ROW
 EXECUTE FUNCTION check_borrower_eligibility();
 
--- Function to set loan period and due date
+-- Function to set loan period and expected return date
 CREATE OR REPLACE FUNCTION set_loan_period()
 RETURNS TRIGGER AS $$
+DECLARE 
 BEGIN
-    NEW.borrow_date := CURRENT_DATE;
-    -- Set expected return date to 3 months from borrow date
-    NEW.return_date := NEW.borrow_date + INTERVAL '3 months';
-    
-    RETURN NEW;
+	IF NEW.borrow_date IS NULL
+	THEN UPDATE loan
+	SET borrow_date = CURRENT_DATE,
+	return_date = CURRENT_DATE + INTERVAL '3 months'
+	WHERE loan_id = NEW.loan_id;
+	ELSE 
+	UPDATE loan
+	SET return_date = borrow_date + INTERVAL '3 months'
+	WHERE loan_id = NEW.loan_id;
+	END IF;
+    RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
+
 
 -- Trigger to set loan period automatically
 CREATE TRIGGER set_loan_period_trigger
@@ -113,16 +121,16 @@ CREATE OR REPLACE FUNCTION initialize_borrower()
 RETURNS TRIGGER AS $$
 BEGIN
     --Initial deposit amount
-    NEW.deposit := 100000;
-    NEW.black_list := false;
-    
-    RETURN NEW;
+   	UPDATE borrower
+	SET deposit = 100000,
+		black_list = false;
+    RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
 
 -- Trigger to initialize new borrower accounts
 CREATE TRIGGER initialize_borrower_trigger
-BEFORE INSERT ON borrower
+AFTER INSERT ON borrower
 FOR EACH ROW
 EXECUTE FUNCTION initialize_borrower();
 
@@ -159,25 +167,6 @@ END;
 $$ LANGUAGE plpgsql;
 
 
--- Function to handle damaged book returns 
-CREATE OR REPLACE FUNCTION handle_damaged_book_return()
-RETURNS TRIGGER AS $$
-DECLARE
-    book_price INTEGER;
-BEGIN
-    SELECT price INTO book_price FROM book;
-    UPDATE loan SET NEW.fee = book_price
-    WHERE loan_id = NEW.loan_id;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
--- Trigger to handle damaged book returns 
-CREATE TRIGGER trigger_handle_damaged_book_return
-BEFORE UPDATE ON loan
-FOR EACH ROW
-WHEN (NEW.damaged = True)
-EXECUTE FUNCTION handle_damaged_book_return();
 
 -- UPDATE FEE
 CREATE OR REPLACE FUNCTION book_fee()
