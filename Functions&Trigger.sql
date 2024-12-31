@@ -178,3 +178,37 @@ BEFORE UPDATE ON loan
 FOR EACH ROW
 WHEN (NEW.damaged = True)
 EXECUTE FUNCTION handle_damaged_book_return();
+
+-- UPDATE FEE
+CREATE OR REPLACE FUNCTION book_fee()
+RETURNS TRIGGER AS
+$$ 
+DECLARE
+	paid_fee INT;
+	book_price INT;
+BEGIN
+	paid_fee = 0;
+	IF NEW.date > OLD.return_date
+	THEN paid_fee = paid_fee + 100000;
+	END IF;
+	
+	IF NEW.damaged = true
+	THEN SELECT price INTO book_price FROM book WHERE book_id = OLD.book_id;
+	paid_fee = paid_fee + book_price;
+	END IF;	
+	
+	UPDATE loan
+    SET fee = paid_fee
+    WHERE loan_id = OLD.loan_id
+    AND (fee IS DISTINCT FROM paid_fee);
+	RAISE NOTICE 'trigger';
+	RETURN NULL;
+END
+$$ language plpgsql;
+
+CREATE OR REPLACE TRIGGER update_fee
+AFTER UPDATE ON loan
+FOR EACH ROW
+WHEN (NEW.date is DISTINCT FROM OLD.date
+    OR NEW.damaged = true)
+EXECUTE PROCEDURE book_fee();
